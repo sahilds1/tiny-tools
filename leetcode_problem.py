@@ -1,75 +1,95 @@
-# Load LeetCode by Problem Number
+# Open a LeetCode problem from its number
+
+import webbrowser
+import argparse
 
 import requests
-# TODO: Write a TIL on webbrowser 
 
-#The webbrowser module provides a high-level interface to allow displaying web-based documents to users. Under most circumstances, simply calling the open() function from this module will do the right thing.
+def get_problem_slug(problem_number: str) -> str:
+    """
+    Get the tile slug of a LeetCode problem from its number
 
-#The script webbrowser can be used as a command-line interface for the module. It accepts a URL as the argument. It accepts the following optional parameters:
+    Parameters
+    ----------
+    problem_number: str
 
-# -n/--new-window opens the URL in a new browser window, if possible.
+    Returns
+    -------
+    str
+    """
 
-# -t/--new-tab opens the URL in a new browser page (“tab”).
-
-# The options are, naturally, mutually exclusive. Usage example:
-
-# python -m webbrowser -t "https://www.python.org"
-import webbrowser
-
-
-url = "https://leetcode.com/graphql/"
-# TODO: Read about Headers
-headers = {
-    "Content-Type": "application/json"
-}
-# TODO: Read about GraphQL query
-payload = {
-    "query": """
-    query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {
-        problemsetQuestionList: questionList(
-            categorySlug: $categorySlug
-            limit: $limit
-            skip: $skip
-            filters: $filters
-        ) {
-            total: totalNum
-            questions: data {
-                acRate
-                difficulty
-                freqBar
-                frontendQuestionId: questionFrontendId
-                isFavor
-                paidOnly: isPaidOnly
-                status
-                title
-                titleSlug
-                topicTags {
-                    name
-                    id
-                    slug
+    url = "https://leetcode.com/graphql/"
+    # TODO: Read about Headers
+    headers = {
+        "Content-Type": "application/json"
+    }
+    # TODO: Read about GraphQL query
+    # TODO: Avoid unnecessary keys in the GraphQL query. Many fields in the response (acRate, difficulty, freqBar, etc.) are unused.
+    payload = {
+        "query": """
+        query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {
+            problemsetQuestionList: questionList(
+                categorySlug: $categorySlug
+                limit: $limit
+                skip: $skip
+                filters: $filters
+            ) {
+                total: totalNum
+                questions: data {
+                    acRate
+                    difficulty
+                    freqBar
+                    frontendQuestionId: questionFrontendId
+                    isFavor
+                    paidOnly: isPaidOnly
+                    status
+                    title
+                    titleSlug
+                    topicTags {
+                        name
+                        id
+                        slug
+                    }
+                    hasSolution
+                    hasVideoSolution
                 }
-                hasSolution
-                hasVideoSolution
             }
         }
+        """,
+        "variables": {
+            "categorySlug": "all-code-essentials",
+            "skip": 0,
+            #TODO: Read about reducing limit to optimize performance
+            "limit": 20,
+            "filters": {
+                "searchKeywords": f"{problem_number}"
+            }
+        },
+        "operationName": "problemsetQuestionList"
     }
-    """,
-    "variables": {
-        "categorySlug": "all-code-essentials",
-        "skip": 0,
-        "limit": 20,
-        "filters": {
-            "searchKeywords": "1346"
-        }
-    },
-    "operationName": "problemsetQuestionList"
-}
 
-#TODO: Add  check that the request was successful 
-#TODO: Read the requests.post API documentation   
-response = requests.post(url, json=payload, headers=headers)
+    try:
+        #TODO: Read the requests.post API documentation   
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"Request error: {e}")
 
-#Decode into a dictionary using response.json() 
-title_slug = response.json()['data']['problemsetQuestionList']['questions'][0]['titleSlug']
+    # TODO: Add error handling for no problem found for problem number or unexpected response format
+    try:
+        # Decode into a dictionary using response.json() 
+        title_slug = response.json()['data']['problemsetQuestionList']['questions'][0]['titleSlug']
+    except Exception as e:
+        raise RuntimeError(f"Response error: {e}")
+        
+    return title_slug
 
-webbrowser.open(f"https://leetcode.com/problems/{title_slug}")
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description="Open a LeetCode problem by its number")
+    parser.add_argument("--num", required=True, help="LeetCode problem number")
+    args = parser.parse_args()
+
+    title_slug = get_problem_slug(args.num)
+
+    webbrowser.open(f"https://leetcode.com/problems/{title_slug}")
