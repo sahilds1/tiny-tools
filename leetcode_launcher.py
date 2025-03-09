@@ -7,24 +7,24 @@ import requests
 
 def get_problem_slug(problem_number: str) -> str:
     """
-    Get the tile slug of a LeetCode problem from its number
+    Get the title slug of a LeetCode problem from its number
 
     Parameters
     ----------
-    problem_number: str
+    problem_number: str 
 
     Returns
     -------
     str
     """
 
-    url = "https://leetcode.com/graphql/"
-    # TODO: Read about Headers
+    # TODO: Check for errors in the response because GraphQL always returns 200
+    url = "https://leetcode.com/graphql/" 
+
     headers = {
         "Content-Type": "application/json"
     }
-    # TODO: Read about GraphQL query
-    # TODO: Avoid unnecessary keys in the GraphQL query. Many fields in the response (acRate, difficulty, freqBar, etc.) are unused.
+
     payload = {
         "query": """
         query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {
@@ -34,24 +34,8 @@ def get_problem_slug(problem_number: str) -> str:
                 skip: $skip
                 filters: $filters
             ) {
-                total: totalNum
                 questions: data {
-                    acRate
-                    difficulty
-                    freqBar
-                    frontendQuestionId: questionFrontendId
-                    isFavor
-                    paidOnly: isPaidOnly
-                    status
-                    title
                     titleSlug
-                    topicTags {
-                        name
-                        id
-                        slug
-                    }
-                    hasSolution
-                    hasVideoSolution
                 }
             }
         }
@@ -59,7 +43,6 @@ def get_problem_slug(problem_number: str) -> str:
         "variables": {
             "categorySlug": "all-code-essentials",
             "skip": 0,
-            #TODO: Read about reducing limit to optimize performance
             "limit": 20,
             "filters": {
                 "searchKeywords": f"{problem_number}"
@@ -67,20 +50,11 @@ def get_problem_slug(problem_number: str) -> str:
         },
         "operationName": "problemsetQuestionList"
     }
+    
+    response = requests.post(url, json=payload, headers=headers)
 
-    try:
-        #TODO: Read the requests.post API documentation   
-        response = requests.post(url, json=payload, headers=headers)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"Request error: {e}")
-
-    # TODO: Add error handling for no problem found for problem number or unexpected response format
-    try:
-        # Decode into a dictionary using response.json() 
-        title_slug = response.json()['data']['problemsetQuestionList']['questions'][0]['titleSlug']
-    except Exception as e:
-        raise RuntimeError(f"Response error: {e}")
+    # Decode into a dictionary using response.json() 
+    title_slug = response.json()['data']['problemsetQuestionList']['questions'][0]['titleSlug']
         
     return title_slug
 
