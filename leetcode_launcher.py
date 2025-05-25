@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Open a LeetCode problem from its number
 
 import webbrowser
