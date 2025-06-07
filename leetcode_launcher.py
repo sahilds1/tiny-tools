@@ -13,13 +13,14 @@ import argparse
 
 import requests
 
+
 def get_problem_slug(problem_number: str) -> str:
     """
     Get the title slug of a LeetCode problem from its number
 
     Parameters
     ----------
-    problem_number: str 
+    problem_number: str
 
     Returns
     -------
@@ -27,11 +28,9 @@ def get_problem_slug(problem_number: str) -> str:
     """
 
     # TODO: Check for errors in the response because GraphQL always returns 200
-    url = "https://leetcode.com/graphql/" 
+    url = "https://leetcode.com/graphql/"
 
-    headers = {
-        "Content-Type": "application/json"
-    }
+    headers = {"Content-Type": "application/json"}
 
     payload = {
         "query": """
@@ -52,23 +51,25 @@ def get_problem_slug(problem_number: str) -> str:
             "categorySlug": "all-code-essentials",
             "skip": 0,
             "limit": 20,
-            "filters": {
-                "searchKeywords": f"{problem_number}"
-            }
+            "filters": {"searchKeywords": f"{problem_number}"},
         },
-        "operationName": "problemsetQuestionList"
+        "operationName": "problemsetQuestionList",
     }
-    
+
     response = requests.post(url, json=payload, headers=headers)
 
-    # Decode into a dictionary using response.json() 
-    title_slug = response.json()['data']['problemsetQuestionList']['questions'][0]['titleSlug']
-        
+    # Decode into a dictionary using response.json()
+    title_slug = response.json()["data"]["problemsetQuestionList"]["questions"][0][
+        "titleSlug"
+    ]
+
     return title_slug
 
-if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description="Open a LeetCode problem by its number")
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Open a LeetCode problem by its number"
+    )
     parser.add_argument("--num", required=True, help="LeetCode problem number")
     args = parser.parse_args()
 
