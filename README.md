@@ -1,16 +1,23 @@
 # Tiny Tools
 Small personal utilities  
 
-## leetcode_launcher
+## leetcode_launcher: LeetCode Problem Opener
 
-A Python script for opening a LeetCode problem from its problem number
+A command-line tool to open a LeetCode problem in your browser by specifying its problem number
 
 ### Usage
 
-Install `requests` if not installed and run the script from the command line: 
+
+Execute [using `uv` to manage depenendices](https://docs.astral.sh/uv/guides/scripts/) without manually managing enviornments:
 
 ```sh
-python leetcode_launcher.py --num 1
+uv run leetcode_launcher.py --num 1
+```
+
+Execute without using uv run by adding the script to your PATH and ensuring it is executable:
+
+```sh
+leetcode_launcher.py --num 1
 ```
 
 ## Contributing
