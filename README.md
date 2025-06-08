@@ -20,6 +20,22 @@ Execute without using uv run by adding the script to your PATH and ensuring it i
 leetcode_launcher.py --num 1
 ```
 
+## websters1913: Word definitions from Webster's 1913 dictionary
+
+A command line tool to [output word definitions from websters1913.com](https://jsomers.net/blog/dictionary)
+
+Execute [using `uv` to manage depenendices](https://docs.astral.sh/uv/guides/scripts/) without manually managing enviornments:
+
+```sh
+uv run websters1913.py --word pathos
+```
+
+Execute without using uv run by adding the script to your PATH and ensuring it is executable:
+
+```sh
+websters1913.py --word pathos 
+```
+
 ## Contributing
 
 Contributions are welcome! 
