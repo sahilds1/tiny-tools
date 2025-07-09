@@ -1,12 +1,10 @@
 # Tiny Tools
-Small personal utilities  
+
+Small personal utilities
 
 ## leetcode_launcher: LeetCode Problem Opener
 
 A command-line tool to open a LeetCode problem in your browser by specifying its problem number
-
-### Usage
-
 
 Execute [using `uv` to manage depenendices](https://docs.astral.sh/uv/guides/scripts/) without manually managing enviornments:
 
@@ -33,12 +31,22 @@ uv run websters1913.py --word pathos
 Execute without using uv run by adding the script to your PATH and ensuring it is executable:
 
 ```sh
-websters1913.py --word pathos 
+websters1913.py --word pathos
+```
+
+## llm_commit_message.py: Generate a commit message based on a diff input
+
+A command line tool to generate a commit message based on a diff input
+
+Execute [using `uv` to manage depenendices](https://docs.astral.sh/uv/guides/scripts/) without manually managing enviornments:
+
+```sh
+git diff --cached | uv run --script llm_commit_message.py | cat
 ```
 
 ## Contributing
 
-Contributions are welcome! 
+Contributions are welcome!
 
 ## License
 Tiny Tools is licensed under the [Functional Source License, Version 1.1, ALv2 Future License](https://fair.io/licenses/)
