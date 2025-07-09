@@ -11,6 +11,7 @@ import sys
 
 from openai import OpenAI
 
+
 def generate_commit_message(diff: str) -> str:
     """Generate a commit message based on the provided diff."""
 
