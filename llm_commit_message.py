@@ -11,6 +11,22 @@ import sys
 
 from openai import OpenAI
 
+INSTRUCTIONS = """
+Generate a commit message based on the provided diff.
+The commit message should be a single line and should be a short description of the changes.
+The commit message should be in the following format:
+<type>: <description>
+The type should be one of the following:
+
+ADD adding new feature
+FIX a bug
+DOC documentation only
+REF refactoring that doesn't include any changes in features 
+FMT formatting only (spacing...)
+MAK repository related changes (e.g., changes in the ignore list)
+TEST related to test code only.
+"""
+
 
 def generate_commit_message(diff: str) -> str:
     """Generate a commit message based on the provided diff."""
@@ -19,7 +35,7 @@ def generate_commit_message(diff: str) -> str:
 
     response = client.responses.create(
         model="gpt-4.1-nano",
-        instructions="Draft a commit message based on the provided diff.",
+        instructions=INSTRUCTIONS,
         input=diff,
     )
 
