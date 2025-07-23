@@ -34,7 +34,7 @@ Execute without using uv run by adding the script to your PATH and ensuring it i
 websters1913.py --word pathos
 ```
 
-## llm_commit_message.py: Generate a commit message based on a diff input
+## llm_commit_message: Generate a commit message based on a diff input
 
 A command line tool to generate a commit message based on a diff input
 
@@ -42,6 +42,12 @@ Execute [using `uv` to manage depenendices](https://docs.astral.sh/uv/guides/scr
 
 ```sh
 git diff --cached | uv run --script llm_commit_message.py | cat
+```
+
+Execute without using uv run by adding the script to your PATH and ensuring it is executable:
+
+```sh
+git diff --cached | llm_commit_message.py | cat
 ```
 
 ## Contributing
