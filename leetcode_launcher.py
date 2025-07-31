@@ -10,8 +10,11 @@
 
 import webbrowser
 import argparse
+import logging
 
 import requests
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
 def get_problem_slug(problem_number: str) -> str:
@@ -26,12 +29,12 @@ def get_problem_slug(problem_number: str) -> str:
     -------
     str
     """
+    logging.info(f"Fetching problem slug for problem #{problem_number}")
 
-    # TODO: Check for errors in the response because GraphQL always returns 200
     url = "https://leetcode.com/graphql/"
-
     headers = {"Content-Type": "application/json"}
 
+    # TODO: Added a fallback search method that looks for exact matches by questionFrontendId.
     payload = {
         "query": """
         query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {
@@ -56,12 +59,24 @@ def get_problem_slug(problem_number: str) -> str:
         "operationName": "problemsetQuestionList",
     }
 
-    response = requests.post(url, json=payload, headers=headers)
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+    except requests.RequestException as e:
+        raise requests.RequestException(
+            f"Network error fetching problem {problem_number}: {e}"
+        )
 
-    # Decode into a dictionary using response.json()
-    title_slug = response.json()["data"]["problemsetQuestionList"]["questions"][0][
-        "titleSlug"
-    ]
+    try:
+        # TODO: Fetching 20 results but only using the first one
+        response_data = response.json()
+        questions = response_data["data"]["problemsetQuestionList"]["questions"]
+        logging.info(f"Found {len(questions)} matching problems")
+        title_slug = questions[0]["titleSlug"]
+        logging.info(f"Using problem slug: {title_slug}")
+    except IndexError:
+        raise IndexError(f"Empty response for problem {problem_number}")
+    except TypeError:
+        raise TypeError(f"Malformed response for problem {problem_number}")
 
     return title_slug
 
@@ -70,9 +85,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Open a LeetCode problem by its number"
     )
-    parser.add_argument("--num", required=True, help="LeetCode problem number")
+    parser.add_argument(
+        "--num", type=int, required=True, help="LeetCode problem number"
+    )
     args = parser.parse_args()
+
+    # Additional validation for reasonable range
+    if args.num <= 0:
+        parser.error(f"Problem number must be positive, got: {args.num}")
 
     title_slug = get_problem_slug(args.num)
 
-    webbrowser.open(f"https://leetcode.com/problems/{title_slug}")
+    problem_url = f"https://leetcode.com/problems/{title_slug}"
+    logging.info(f"Opening LeetCode problem URL: {problem_url}")
+    webbrowser.open(problem_url)
+    logging.info("Successfully opened problem in browser")
