@@ -34,17 +34,16 @@ def get_problem_slug(problem_number: str) -> str:
     url = "https://leetcode.com/graphql/"
     headers = {"Content-Type": "application/json"}
 
-    # TODO: Added a fallback search method that looks for exact matches by questionFrontendId.
+    # Check valid filter fields for QuestionListFilterInput
     payload = {
         "query": """
-        query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {
+        query problemsetQuestionList($categorySlug: String, $filters: QuestionListFilterInput) {
             problemsetQuestionList: questionList(
                 categorySlug: $categorySlug
-                limit: $limit
-                skip: $skip
                 filters: $filters
             ) {
                 questions: data {
+                    questionFrontendId
                     titleSlug
                 }
             }
@@ -52,8 +51,6 @@ def get_problem_slug(problem_number: str) -> str:
         """,
         "variables": {
             "categorySlug": "all-code-essentials",
-            "skip": 0,
-            "limit": 20,
             "filters": {"searchKeywords": f"{problem_number}"},
         },
         "operationName": "problemsetQuestionList",
@@ -67,15 +64,29 @@ def get_problem_slug(problem_number: str) -> str:
         )
 
     try:
-        # TODO: Fetching 20 results but only using the first one
         response_data = response.json()
         questions = response_data["data"]["problemsetQuestionList"]["questions"]
+
         logging.info(f"Found {len(questions)} matching problems")
-        title_slug = questions[0]["titleSlug"]
-        logging.info(f"Using problem slug: {title_slug}")
-    except IndexError:
-        raise IndexError(f"Empty response for problem {problem_number}")
-    except TypeError:
+
+        # Check if we got any results at all
+        if not questions:
+            raise IndexError(f"Empty response for problem {problem_number}")
+
+        # Filter for exact questionFrontendId match
+        # TODO: Rewrite this using hashing
+        matching_question = None
+        for question in questions:
+            if question["questionFrontendId"] == str(problem_number):
+                matching_question = question
+                break
+
+        if matching_question is None:
+            raise IndexError(f"No exact match found for problem {problem_number}")
+
+        title_slug = matching_question["titleSlug"]
+        logging.info(f"Found exact match - using problem slug: {title_slug}")
+    except (KeyError, TypeError):
         raise TypeError(f"Malformed response for problem {problem_number}")
 
     return title_slug
