@@ -8,44 +8,71 @@
 # ///
 
 # Output word definitions from websters1913.com
+# TODO: Consider rate liming to be respectful to the website
+# TODO: Add caching for repeated lookups
 
 import argparse
+import logging
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, ResultSet, Tag
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
-def fetch_definition(word: str) -> list[str]:
+def fetch_definition(word: str) -> ResultSet[Tag]:
+    logging.info(f"Fetching definition for word: '{word}'")
     url = f"https://www.websters1913.com/words/{word}"
-    response = requests.get(url)
+    logging.debug(f"Making request to URL: {url}")
 
-    if response.status_code != 200:
-        raise RuntimeError(
-            f"Error: Unable to fetch definition (status code {response.status_code})"
-        )
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+    except requests.exceptions.ConnectionError:
+        raise RuntimeError("Network connection failed")
+    except requests.exceptions.HTTPError as e:
+        raise RuntimeError(f"HTTP error: {e}")
+    except requests.exceptions.Timeout:
+        raise RuntimeError("Request timed out")
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"Request error: {e}")
 
-    soup = BeautifulSoup(response.text, "html.parser")
-    def_tags = soup.select("def")
-
-    if not def_tags:
-        return [f"No definition found for '{word}' on Websters1913."]
-
-    return [tag.get_text(strip=True) for tag in def_tags]
+    # Websters1913 uses <def> tags
+    try:
+        soup = BeautifulSoup(response.text, "html.parser")
+        def_tags = soup.select("def")
+        return def_tags
+    except Exception as e:
+        raise RuntimeError(f"Failed to parse HTML: {e}")
 
 
 if __name__ == "__main__":
+    logging.info("Starting websters1913 dictionary lookup")
     parser = argparse.ArgumentParser(
         description="Fetch word definitions from websters1913.com"
     )
-    parser.add_argument("--word", help="The word to define")
+    parser.add_argument("--word", required=True, help="The word to define")
     args = parser.parse_args()
 
-    try:
-        definitions = fetch_definition(args.word)
-        # TODO: Strip out newlines and extra spaces from definitions
+    word = args.word.strip()
 
-        print(f"\nDefinitions for '{args.word}':\n")
-        for index, definition in enumerate(definitions):
-            print(f"{index + 1}. {definition}")
-    except Exception as e:
-        print(str(e))
+    if not word:
+        raise ValueError("Word cannot be empty or whitespace")
+
+    def_tags = fetch_definition(word)
+
+    if not def_tags:
+        raise RuntimeError(f"No definition found for '{word}' on Websters1913.")
+
+    definitions = [tag.get_text(strip=True) for tag in def_tags]
+    logging.info(f"Successfully retrieved {len(definitions)} definitions for '{word}'")
+
+    print(f"\nDefinitions for '{word}':\n")
+    for index, definition in enumerate(definitions):
+        clean_definition = " ".join(definition.split())
+        print(f"{index + 1}. {clean_definition}")
+
+    logging.info("Dictionary lookup completed successfully")
