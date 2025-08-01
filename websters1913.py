@@ -57,8 +57,8 @@ if __name__ == "__main__":
     parser.add_argument("--word", required=True, help="The word to define")
     args = parser.parse_args()
 
+    # TODO: Write intput validation as a function for testing
     word = args.word.strip()
-
     if not word:
         raise ValueError("Word cannot be empty or whitespace")
 
@@ -67,6 +67,7 @@ if __name__ == "__main__":
     if not def_tags:
         raise RuntimeError(f"No definition found for '{word}' on Websters1913.")
 
+    # TODO: Write retrieval  of defintions into a function for testing
     definitions = [tag.get_text(strip=True) for tag in def_tags]
     logging.info(f"Successfully retrieved {len(definitions)} definitions for '{word}'")
 
