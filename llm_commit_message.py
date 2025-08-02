@@ -78,6 +78,8 @@ if __name__ == "__main__":
     diff_content = args.input.read()
     logger.info(f"Read {len(diff_content)} characters from input")
 
+    # TODO: Add handling for empty diff
+
     commit_message = generate_commit_message(diff_content)
     print(commit_message)
     logger.info("Script completed successfully")
