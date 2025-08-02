@@ -7,9 +7,16 @@
 # Generate a commit message based on a diff input
 
 import argparse
+import logging
 import sys
 
 import openai
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 # TODO: Add configuration file support for custom instructions
 
@@ -29,13 +36,13 @@ MAK repository related changes (e.g., changes in the ignore list)
 TEST related to test code only.
 """
 
-# TODO: Consider using a local model to reduce API costs
-
 
 def generate_commit_message(diff: str) -> str:
     """Generate a commit message based on the provided diff."""
 
+    # TODO: Consider using a local model to reduce API costs
     client = openai.OpenAI()
+    logger.info("OpenAI client initialized")
 
     try:
         response = client.responses.create(
@@ -54,6 +61,8 @@ def generate_commit_message(diff: str) -> str:
 
 
 if __name__ == "__main__":
+    logger.info("Starting llm_commit_message script")
+
     parser = argparse.ArgumentParser(
         description="Generate a commit message based on a diff input"
     )
@@ -66,4 +75,9 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    print(generate_commit_message(args.input.read()))
+    diff_content = args.input.read()
+    logger.info(f"Read {len(diff_content)} characters from input")
+
+    commit_message = generate_commit_message(diff_content)
+    print(commit_message)
+    logger.info("Script completed successfully")
