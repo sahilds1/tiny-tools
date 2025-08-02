@@ -6,7 +6,7 @@ Small personal utilities
 
 A command-line tool to open a LeetCode problem in your browser by specifying its problem number
 
-Execute [using `uv` to manage depenendices](https://docs.astral.sh/uv/guides/scripts/) without manually managing enviornments:
+Execute [using `uv` to manage dependencies](https://docs.astral.sh/uv/guides/scripts/) without manually managing environments:
 
 ```sh
 uv run leetcode_launcher.py --num 1
@@ -22,7 +22,7 @@ leetcode_launcher.py --num 1
 
 A command line tool to [output word definitions from websters1913.com](https://jsomers.net/blog/dictionary)
 
-Execute [using `uv` to manage depenendices](https://docs.astral.sh/uv/guides/scripts/) without manually managing enviornments:
+Execute [using `uv` to manage dependencies](https://docs.astral.sh/uv/guides/scripts/) without manually managing environments:
 
 ```sh
 uv run websters1913.py --word pathos
@@ -38,7 +38,7 @@ websters1913.py --word pathos
 
 A command line tool to generate a commit message based on a diff input
 
-Execute [using `uv` to manage depenendices](https://docs.astral.sh/uv/guides/scripts/) without manually managing enviornments:
+Execute [using `uv` to manage dependencies](https://docs.astral.sh/uv/guides/scripts/) without manually managing environments:
 
 ```sh
 git diff --cached | uv run --script llm_commit_message.py | cat
