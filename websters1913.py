@@ -8,11 +8,11 @@
 # ///
 
 # Output word definitions from websters1913.com
-# TODO: Consider rate liming to be respectful to the website
 # TODO: Add caching for repeated lookups
 
 import argparse
 import logging
+import time
 
 import requests
 from bs4 import BeautifulSoup, ResultSet, Tag
@@ -27,6 +27,9 @@ def fetch_definition(word: str) -> ResultSet[Tag]:
     logging.info(f"Fetching definition for word: '{word}'")
     url = f"https://www.websters1913.com/words/{word}"
     logging.debug(f"Making request to URL: {url}")
+
+    # Rate limit: wait 1 second to be respectful to the website
+    time.sleep(1)
 
     try:
         response = requests.get(url, timeout=10)
