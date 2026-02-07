@@ -52,12 +52,27 @@ def fetch_arrivals(station: str, direction: str) -> list[dict]:
 
 
 
+def minutes_until(depart_time_str: str) -> int | None:
+    """Calculate minutes until a departure time."""
+    try:
+        depart = datetime.strptime(depart_time_str, "%Y-%m-%d %H:%M:%S.%f")
+        now = datetime.now()
+        delta = depart - now
+        return max(0, int(delta.total_seconds() / 60))
+    except (ValueError, TypeError):
+        return None
+
+
 def format_train(train: dict) -> str:
     """Format a single train arrival for display."""
     line = train.get("line", "?")
     destination = train.get("destination", "?")
     track = train.get("track", "?")
+    depart_time = train.get("depart_time", "")
     sched_time = train.get("sched_time", "")
+
+    mins = minutes_until(depart_time)
+    countdown = f"{mins} min" if mins is not None and mins > 0 else "now" if mins == 0 else "?"
 
     sched_short = ""
     try:
@@ -66,7 +81,7 @@ def format_train(train: dict) -> str:
     except (ValueError, TypeError):
         pass
 
-    return f"  {sched_short:<10} {line:<18} to {destination:<22} Trk {track}"
+    return f"  {sched_short:<10} {line:<18} to {destination:<22} Trk {track:<3} [{countdown}]"
 
 
 def display_direction(trains: list[dict], label: str, count: int = 4) -> None:
@@ -77,8 +92,8 @@ def display_direction(trains: list[dict], label: str, count: int = 4) -> None:
     if not trains:
         print("  No trains scheduled")
         return
-    print(f"  {'Sched':<10} {'Line':<18}    {'Destination':<22} {'Trk'}")
-    print(f"  {'─'*10} {'─'*18}    {'─'*22} {'─'*6}")
+    print(f"  {'Sched':<10} {'Line':<18}    {'Destination':<22} {'Trk':<6} {'Arrives'}")
+    print(f"  {'─'*10} {'─'*18}    {'─'*22} {'─'*6} {'─'*10}")
     for train in trains[:count]:
         print(format_train(train))
 
