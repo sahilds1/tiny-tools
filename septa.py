@@ -5,6 +5,12 @@
 #     "requests",
 # ]
 # ///
+#
+# 
+# TODO:
+# How to use a CORS proxy to get around "No Access-Control-Allow-Origin header" 
+# https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS
+
 
 # Show next trains arriving at a SEPTA Regional Rail station
 
@@ -22,7 +28,10 @@ API_URL = "https://www3.septa.org/api/Arrivals/index.php"
 
 def fetch_arrivals(station: str, direction: str) -> list[dict]:
     """Fetch train arrivals for a station and direction (N or S)."""
+    
+    #URLs cannot contain literal spaces
     encoded = urllib.parse.quote(station)
+    
     url = f"{API_URL}?station={encoded}&direction={direction}"
     logging.info(f"Fetching {direction}bound arrivals from {url}")
 
@@ -32,6 +41,8 @@ def fetch_arrivals(station: str, direction: str) -> list[dict]:
 
     # Response is a dict with one key (station + timestamp), containing a list
     # with one dict that has "Northbound" or "Southbound" key
+    # 
+    # Example: https://www3.septa.org/api/Arrivals/index.php?station=Suburban%20Station&direction=N
     for key, trains_list in data.items():
         if trains_list:
             entry = trains_list[0]
@@ -78,6 +89,9 @@ def main():
     args = parser.parse_args()
 
     station = args.station
+    
+    #TODO: Sanitize Regional Rail Inputs https://www3.septa.org/VIRegionalRail.html
+    
     print(f"\n  Station: {station}")
     print(f"  As of:   {datetime.now().strftime('%B %d, %Y %-I:%M %p')}")
 
