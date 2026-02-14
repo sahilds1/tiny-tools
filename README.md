@@ -50,6 +50,22 @@ Execute without using uv run by adding the script to your PATH and ensuring it i
 git diff --cached | llm_commit_message.py | cat
 ```
 
+## septa: SEPTA Regional Rail arrivals
+
+A command line tool to show the next train arrivals at a SEPTA Regional Rail station
+
+Execute [using `uv` to manage dependencies](https://docs.astral.sh/uv/guides/scripts/) without manually managing environments:
+
+```sh
+uv run septa.py "Suburban Station"
+```
+
+Execute without using uv run by adding the script to your PATH and ensuring it is executable:
+
+```sh
+septa.py "Suburban Station"
+```
+
 ## Contributing
 
 Contributions are welcome!
