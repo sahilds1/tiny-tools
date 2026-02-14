@@ -23,37 +23,59 @@ import requests
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-API_URL = "https://www3.septa.org/api/Arrivals/index.php"
-
 
 def fetch_arrivals(station: str, direction: str) -> list[dict]:
-    """Fetch train arrivals for a station and direction (N or S)."""
+    """
+    Fetch train arrivals for a station and direction (N or S).
+    
+    Parameters
+    ----------
+    station:
+    direction: 
+            
+    Returns
+    -------
+    
+    """
     
     #URLs cannot contain literal spaces
-    encoded = urllib.parse.quote(station)
+    encoded_station = urllib.parse.quote(station)
     
-    url = f"{API_URL}?station={encoded}&direction={direction}"
+    API_URL = "https://www3.septa.org/api/Arrivals/index.php"
+    url = f"{API_URL}?station={encoded_station}&direction={direction}"
     logging.info(f"Fetching {direction}bound arrivals from {url}")
 
-    resp = requests.get(url, timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
+    #TODO requests error handling
+    response = requests.get(url, timeout=10)
+    response.raise_for_status()
+    data = response.json()
 
-    # Response is a dict with one key (station + timestamp), containing a list
-    # with one dict that has "Northbound" or "Southbound" key
-    # 
-    # Example: https://www3.septa.org/api/Arrivals/index.php?station=Suburban%20Station&direction=N
-    for key, trains_list in data.items():
-        if trains_list:
-            entry = trains_list[0]
-            direction_key = "Northbound" if direction == "N" else "Southbound"
-            return entry.get(direction_key, [])
-    return []
+    # TODO: Split off into its own function to make testing easier 
+    
+    # response.json() is a dict with one key (station + timestamp), 
+    # containing a list with one dict that has "Northbound" or "Southbound" key
+    
+    station, trains = data.popitem()
+    if not trains:
+        return []
+    direction, train_arrivals = trains[0].popitem()
+    return train_arrivals
 
 
 
 def minutes_until(depart_time_str: str) -> int | None:
-    """Calculate minutes until a departure time."""
+    """
+    Calculate minutes until a departure time.
+    
+    Parameters:
+    ----------
+    depart_time_str: 
+    
+    
+    Returns:
+    -------
+    
+    """
     try:
         depart = datetime.strptime(depart_time_str, "%Y-%m-%d %H:%M:%S.%f")
         now = datetime.now()
@@ -64,7 +86,17 @@ def minutes_until(depart_time_str: str) -> int | None:
 
 
 def format_train(train: dict) -> str:
-    """Format a single train arrival for display."""
+    """
+    Format a single train arrival for display.
+    
+    Parameters
+    ----------
+    train: 
+        
+    Returns
+    -------
+    
+    """
     line = train.get("line", "?")
     destination = train.get("destination", "?")
     track = train.get("track", "?")
@@ -85,7 +117,21 @@ def format_train(train: dict) -> str:
 
 
 def display_direction(trains: list[dict], label: str, count: int = 4) -> None:
-    """Display trains for one direction."""
+    """
+    Display trains for one direction.
+    
+    Parameters
+    ----------
+    trains:
+    label:
+    count:
+    
+    
+    Returns
+    -------
+    
+    
+    """
     print(f"\n{'─' * 70}")
     print(f"  {label}")
     print(f"{'─' * 70}")
@@ -101,6 +147,7 @@ def display_direction(trains: list[dict], label: str, count: int = 4) -> None:
 def main():
     parser = argparse.ArgumentParser(description="SEPTA Regional Rail next arrivals")
     parser.add_argument("station", type=str, help="Station name (e.g. 'Suburban Station')")
+    # TODO: Add an argument for the number of next arrivals
     args = parser.parse_args()
 
     station = args.station
