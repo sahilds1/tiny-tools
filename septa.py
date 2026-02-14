@@ -11,7 +11,6 @@
 # How to use a CORS proxy to get around "No Access-Control-Allow-Origin header" 
 # https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS
 
-
 # Show next trains arriving at a SEPTA Regional Rail station
 
 import argparse
@@ -23,24 +22,24 @@ import requests
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-
-def fetch_arrivals(station: str, direction: str) -> list[dict]:
+def fetch_response(station: str, direction: str) -> dict:
     """
-    Fetch train arrivals for a station and direction (N or S).
-    
+    Fetch raw JSON response from SEPTA Arrivals API.
+
     Parameters
     ----------
-    station:
-    direction: 
-            
+    station: Station name (e.g. 'Suburban Station')
+    direction: 'N' for Northbound or 'S' for Southbound
+
     Returns
     -------
-    
+    dict: Raw JSON response from the API
+
     """
-    
+
     #URLs cannot contain literal spaces
     encoded_station = urllib.parse.quote(station)
-    
+
     API_URL = "https://www3.septa.org/api/Arrivals/index.php"
     url = f"{API_URL}?station={encoded_station}&direction={direction}"
     logging.info(f"Fetching {direction}bound arrivals from {url}")
@@ -50,17 +49,52 @@ def fetch_arrivals(station: str, direction: str) -> list[dict]:
     response.raise_for_status()
     data = response.json()
 
-    # TODO: Split off into its own function to make testing easier 
+    return data
     
-    # response.json() is a dict with one key (station + timestamp), 
-    # containing a list with one dict that has "Northbound" or "Southbound" key
+
+def process_response(data: dict) -> list[dict]:
+    """
+    Extract train arrivals list from SEPTA API response.
+
+    Parameters
+    ----------
+    data: Raw JSON response from SEPTA API
+
+    Returns
+    -------
+    list[dict]: List of train arrival dicts, or empty list if none
+
+    """
     
+    # SEPTA API response is a dict with one key value pair containing 
+    # a list containing a dict with one key value pair
+
     station, trains = data.popitem()
     if not trains:
         return []
     direction, train_arrivals = trains[0].popitem()
-    return train_arrivals
 
+    return train_arrivals
+    
+
+
+def fetch_arrivals(station: str, direction: str) -> list[dict]:
+    """
+    Fetch train arrivals for a station and direction (N or S).
+
+    Parameters
+    ----------
+    station: Station name (e.g. 'Suburban Station')
+    direction: 'N' for Northbound or 'S' for Southbound
+
+    Returns
+    -------
+    list[dict]: List of train arrival dicts, or empty list if none
+
+    """
+    data = fetch_response(station, direction)
+
+    return process_response(data)
 
 
 def minutes_until(depart_time_str: str) -> int | None:
@@ -112,6 +146,8 @@ def format_train(train: dict) -> str:
         sched_short = dt.strftime("%-I:%M %p")
     except (ValueError, TypeError):
         pass
+
+    # TODO: Split off train arrival data from formatting 
 
     return f"  {sched_short:<10} {line:<18} to {destination:<22} Trk {track:<3} [{countdown}]"
 
