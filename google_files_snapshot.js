@@ -35,6 +35,7 @@
 
 function exportGoogleFilesAsSnapshots() {
   // ── CONFIGURATION ──────────────────────────────────────────
+  const DRY_RUN = true; // set to false to actually write files to Drive
   const BACKUP_FOLDER_NAME = "Google Files Snapshots";
 
   // Consider exporting alternative or additional file type
@@ -81,7 +82,11 @@ function exportGoogleFilesAsSnapshots() {
         // requires the if/else — without it, HTTP errors would throw and catch would suffice,
         // but we'd lose response.getContentText() which explains why a file was skipped.
         if (response.getResponseCode() === 200) {
-          todayFolder.createFile(response.getBlob().setName(fileName));
+          if (DRY_RUN) {
+            Logger.log("DRY RUN: would export → " + fileName);
+          } else {
+            todayFolder.createFile(response.getBlob().setName(fileName));
+          }
           stats.exported++;
         } else {
           Logger.log("Skipped: " + file.getName() + " — " + response.getContentText());
