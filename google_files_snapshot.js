@@ -29,6 +29,12 @@
 // you no longer need. A deleteOldSnapshots() function can be
 // added to automate this if needed in the future.
 
+// This script is read-only with respect to your existing Drive files. Every operation is
+// either a read (DriveApp.getFilesByType, UrlFetchApp.fetch) or a create (createFolder,
+// createFile). There are no calls to delete, trash, or modify any existing file or folder.
+// The OAuth token is obtained at runtime via ScriptApp.getOAuthToken(), used inline, and
+// never logged or stored. All data stays within Google — no external endpoints are called.
+
 // Apps Scripts is free but has daily usage limits
 // Script runtime 6 minutes per execution
 // URL fetch calls 20000 per day 
