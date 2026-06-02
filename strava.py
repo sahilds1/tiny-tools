@@ -3,6 +3,7 @@
 # requires-python = ">=3.13"
 # dependencies = [
 #     "stravalib==2.4",
+#     "llm==0.31",
 # ]
 # ///
 
@@ -15,7 +16,10 @@ import time
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import llm
 from stravalib import Client
+
+from strava_prompts import SYSTEM_PROMPT
 
 TOKEN_PATH = Path.home() / ".strava_tokens.json"
 
@@ -96,8 +100,14 @@ def get_authenticated_client(client_id: int, client_secret: str) -> Client:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Output a Strava activity for chat analysis")
+    parser = argparse.ArgumentParser(description="Chat about a Strava activity with an LLM")
     parser.add_argument("activity_id", type=int, help="Strava activity ID")
+    parser.add_argument(
+        "-m",
+        "--model",
+        default=None,
+        help="llm model to use (default: your configured llm default model)",
+    )
     args = parser.parse_args()
 
     # TOOD: Read the  STRAVA CLIENT ID and STRAVA CLIENT SECRET enviornment variables from a file
@@ -109,13 +119,50 @@ def main():
     # TODO: Add typing for activity stravalib.model.DetailedActivity
     activity = client.get_activity(args.activity_id, include_all_efforts=True)
 
-    # TODO: format_activity — format key fields (distance, pace, splits, HR, best efforts)
-    # into a readable text block for pasting into a chat conversation.
+    # Drop the raw activity (a pydantic model) into the LLM context as JSON.
+    # TODO: Replace with a curated format_activity() that converts to a human-readable
+    # summary (km/mi, pace, splits, best efforts) and serves as a testable format_* seam.
     # TODO: Include time-series streams (HR, pace, power) via client.get_activity_streams()
     # for richer per-second data in the chat analysis.
-    # TODO: Pipe output through an LLM using strava_prompts.py
-    # (similar to how llm_commit_message.py works) and print the analysis directly.
-    print(activity)
+    context = activity.model_dump_json(indent=2)
+
+    # Drive the chat with the `llm` Python API
+    # (https://llm.datasette.io/en/stable/python-api.html):
+    # - llm.get_model(None) returns llm's configured default model; -m/--model overrides it,
+    #   so this script relies on whatever model/key the user has set up via `llm`.
+    # - model.conversation() is a multi-turn object that retains history automatically, so
+    #   follow-up questions keep the context of earlier turns (and the activity below).
+    model = llm.get_model(args.model)
+    conversation = model.conversation()
+
+    # Seed the activity into context via the system prompt so it's available without a
+    # round-trip — nothing is sent until the user asks a question.
+    # TODO: Optionally print an initial analysis automatically before the loop, e.g.
+    # conversation.prompt(context, system=SYSTEM_PROMPT) and stream the response.
+    system = f"{SYSTEM_PROMPT}\n\nStrava activity (JSON):\n{context}"
+
+    print(f"Chatting about activity {args.activity_id}. Ask a question ('exit' or Ctrl-D to quit).")
+    first = True
+    while True:
+        try:
+            user_input = input("\n> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if not user_input:
+            continue
+        if user_input.lower() in ("exit", "quit"):
+            break
+
+        # conversation.prompt() sends the turn to the model; the system prompt (carrying the
+        # activity) is passed only on the first turn, since the conversation retains history.
+        response = conversation.prompt(user_input, system=system) if first else conversation.prompt(user_input)
+        first = False
+
+        # An llm response is iterable: looping over it streams text chunks as they arrive.
+        for chunk in response:
+            print(chunk, end="", flush=True)
+        print()
 
 
 if __name__ == "__main__":
