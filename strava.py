@@ -7,12 +7,13 @@
 # ]
 # ///
 
-# Output Strava activity to analyze in a Chat conversation
+# Chat about Strava activities (by id, single date, or date range) in a conversation with an LLM
 
 import argparse
 import json
 import os
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -99,9 +100,33 @@ def get_authenticated_client(client_id: int, client_secret: str) -> Client:
         return client
 
 
+def parse_date(s: str) -> datetime:
+    """Parse a YYYY-MM-DD string into a midnight datetime (treated as UTC by Strava)."""
+    return datetime.strptime(s, "%Y-%m-%d")
+
+
+def fetch_activities_in_range(client: Client, after, before=None) -> list:
+    """Return DetailedActivity objects for activities in the [after, before) window.
+
+    get_activities only returns SummaryActivity, so wrap each summary with get_activity
+    to upgrade it to the full DetailedActivity used for chat context.
+    """
+    # Note: with before=None this pulls every activity since `after` and makes one
+    # get_activity call per match, which can be many requests on a wide window
+    # (Strava rate-limits ~100 requests / 15 min).
+    # TODO: Add a --limit cap to bound the number of activities (and API calls).
+    summaries = client.get_activities(after=after, before=before)
+    return [client.get_activity(s.id, include_all_efforts=True) for s in summaries]
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Chat about a Strava activity with an LLM")
-    parser.add_argument("activity_id", type=int, help="Strava activity ID")
+    parser = argparse.ArgumentParser(description="Chat about Strava activities with an LLM")
+    # Note: dates filter by UTC start date, which can differ from the athlete's local day.
+    selection = parser.add_mutually_exclusive_group(required=True)
+    selection.add_argument("--id", type=int, help="Strava activity ID")
+    selection.add_argument("--date", help="Activities on a single day (YYYY-MM-DD)")
+    selection.add_argument("--start", help="Range start date (YYYY-MM-DD)")
+    parser.add_argument("--end", help="Range end date (YYYY-MM-DD, inclusive); requires --start")
     parser.add_argument(
         "-m",
         "--model",
@@ -110,21 +135,37 @@ def main():
     )
     args = parser.parse_args()
 
+    if args.end and not args.start:
+        parser.error("--end requires --start")
+
     # TOOD: Read the  STRAVA CLIENT ID and STRAVA CLIENT SECRET enviornment variables from a file
     client_id = int(os.environ["STRAVA_CLIENT_ID"])
     client_secret = os.environ["STRAVA_CLIENT_SECRET"]
 
     client = get_authenticated_client(client_id, client_secret)
 
-    # TODO: Add typing for activity stravalib.model.DetailedActivity
-    activity = client.get_activity(args.activity_id, include_all_efforts=True)
+    # Resolve the selection into a list of DetailedActivity objects.
+    # TODO: Add typing for activities list[stravalib.model.DetailedActivity]
+    if args.id is not None:
+        activities = [client.get_activity(args.id, include_all_efforts=True)]
+    elif args.date:
+        after = parse_date(args.date)
+        activities = fetch_activities_in_range(client, after, after + timedelta(days=1))
+    else:
+        after = parse_date(args.start)
+        before = parse_date(args.end) + timedelta(days=1) if args.end else None
+        activities = fetch_activities_in_range(client, after, before)
 
-    # Drop the raw activity (a pydantic model) into the LLM context as JSON.
+    if not activities:
+        print("No activities found for that selection.")
+        return
+
+    # Drop the raw activities (pydantic models) into the LLM context as a JSON list.
     # TODO: Replace with a curated format_activity() that converts to a human-readable
     # summary (km/mi, pace, splits, best efforts) and serves as a testable format_* seam.
     # TODO: Include time-series streams (HR, pace, power) via client.get_activity_streams()
     # for richer per-second data in the chat analysis.
-    context = activity.model_dump_json(indent=2)
+    context = json.dumps([a.model_dump(mode="json") for a in activities], indent=2)
 
     # Drive the chat with the `llm` Python API
     # (https://llm.datasette.io/en/stable/python-api.html):
@@ -139,10 +180,12 @@ def main():
     # round-trip — nothing is sent until the user asks a question.
     # TODO: Optionally print an initial analysis automatically before the loop, e.g.
     # conversation.prompt(context, system=SYSTEM_PROMPT) and stream the response.
-    system = f"{SYSTEM_PROMPT}\n\nStrava activity (JSON):\n{context}"
+    system = f"{SYSTEM_PROMPT}\n\nStrava activities (JSON):\n{context}"
 
-    print(f"Chatting about activity {args.activity_id}. Ask a question ('exit' or Ctrl-D to quit).")
-    first = True
+    print(f"Chatting about {len(activities)} activit{'y' if len(activities) == 1 else 'ies'}. "
+          "Ask a question ('exit' or Ctrl-D to quit).")
+    first_turn = True
+    
     while True:
         try:
             user_input = input("\n> ").strip()
@@ -156,13 +199,18 @@ def main():
 
         # conversation.prompt() sends the turn to the model; the system prompt (carrying the
         # activity) is passed only on the first turn, since the conversation retains history.
-        response = conversation.prompt(user_input, system=system) if first else conversation.prompt(user_input)
-        first = False
 
-        # An llm response is iterable: looping over it streams text chunks as they arrive.
-        for chunk in response:
-            print(chunk, end="", flush=True)
-        print()
+        if first_turn:
+            response = conversation.prompt(user_input, system=system)
+        else:
+            response = conversation.prompt(user_input)
+
+        first_turn = False
+
+        # response.text() resolves and returns the full reply as a single string.
+        # Alternative: an llm response is iterable, so you can stream each text chunk as it
+        # arrives with `for chunk in response: print(chunk, end="", flush=True)`.
+        print(response.text())
 
 
 if __name__ == "__main__":
