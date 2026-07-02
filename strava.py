@@ -4,6 +4,7 @@
 # dependencies = [
 #     "stravalib==2.4",
 #     "llm==0.31",
+#     "python-dotenv==1.0.1",
 # ]
 # ///
 
@@ -18,6 +19,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import llm
+from dotenv import load_dotenv
 from stravalib import Client
 
 from strava_prompts import SYSTEM_PROMPT
@@ -138,9 +140,28 @@ def main():
     if args.end and not args.start:
         parser.error("--end requires --start")
 
-    # TOOD: Read the  STRAVA CLIENT ID and STRAVA CLIENT SECRET enviornment variables from a file
-    client_id = int(os.environ["STRAVA_CLIENT_ID"])
-    client_secret = os.environ["STRAVA_CLIENT_SECRET"]
+    # Load STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET, and OPENAI_API_KEY from a local .env
+    # (gitignored; see .env.example) so they don't have to be exported in the shell.
+    #
+    # Precedence / priority of these variables:
+    # - load_dotenv() does NOT override variables already set in the real environment, so an
+    #   existing `export FOO=...` in your shell wins over the .env value. Unset the shell var
+    #   if you want .env to be the source of truth.
+    # - This must run before llm.get_model() below: the OpenAI key is never read by this
+    #   script directly — `llm` reads OPENAI_API_KEY from the environment, so it only sees
+    #   the .env value once load_dotenv() has populated os.environ.
+    # - `llm` checks its own keystore (`llm keys set openai`) BEFORE the OPENAI_API_KEY env
+    #   var, so a key stored there would take priority over anything in .env.
+    load_dotenv()
+
+    client_id = os.environ.get("STRAVA_CLIENT_ID")
+    client_secret = os.environ.get("STRAVA_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        parser.error(
+            "Set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET in the environment "
+            "or in a .env file (see .env.example)."
+        )
+    client_id = int(client_id)
 
     client = get_authenticated_client(client_id, client_secret)
 
