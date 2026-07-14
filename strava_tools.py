@@ -10,6 +10,8 @@
 from pathlib import Path
 from typing import NamedTuple
 
+from sklearn.feature_extraction.text import TfidfVectorizer
+
 # Default runlog location (the RUNLOG.txt next to this script). strava.py can override this
 # module attribute from its --runlog flag, and tests point it at a fixture file.
 RUNLOG_PATH = Path(__file__).parent / "RUNLOG.txt"
@@ -49,34 +51,47 @@ def parse_runlog(text: str) -> list[RunlogEntry]:
     return entries
 
 
-def _tokenize(s: str) -> list[str]:
-    """Lowercase alphanumeric word tokens, so 'Half-Marathon!' -> ['half', 'marathon']."""
-    return ["".join(c for c in tok if c.isalnum()) for tok in s.lower().split() if tok]
-
-
 def search_entries(
     entries: list[RunlogEntry], query: str, limit: int = 3
 ) -> list[RunlogEntry]:
-    """Rank entries by case-insensitive query-term matches and return the top `limit`.
+    """Rank entries by TF-IDF cosine similarity to the query and return the top `limit`.
 
-    A term found in the title counts double a term found in the body. Entries with no
-    matching term are dropped; ties keep the original (chronological) order.
+    TF-IDF weights each term by how rare it is across the log, so a match on a distinctive
+    word (e.g. 'fartlek') outranks a match on a ubiquitous one (e.g. 'run') -- the thing
+    plain term-counting got wrong. Entries sharing no terms with the query are dropped;
+    ties keep the log's original (chronological) order.
     """
-    terms = set(_tokenize(query))
-    if not terms:
+    # Decision: scikit-learn's TfidfVectorizer instead of a hand-rolled scorer. It gives the
+    # simplest correct code -- it tokenizes, lowercases, and L2-normalizes for us -- at the
+    # cost of a heavy numpy/scipy dependency, declared in BOTH strava.py's script block and
+    # pyproject.toml because standalone `uv run strava.py` and `uv run pytest` are different
+    # environments. We chose the smaller function over the lighter dependency on purpose.
+    #
+    # Decision: title text is folded into the document but NOT up-weighted. Runlog titles are
+    # just a date + run type, so a title-only boost wasn't worth the extra code; if titles
+    # ever need to rank higher, double them here (f"{e.title} {e.title}\n{e.body}").
+    #
+    # BM25 is the natural next step if ranking needs to improve: it keeps this TF-IDF backbone
+    # but adds term-frequency saturation (repeated terms give diminishing returns) and
+    # document-length normalization (long entries don't win just by being long). To switch,
+    # replace only the vectorize-and-score lines below -- keeping the guard, the `> 0` filter,
+    # and the sort/limit tail -- with either rank-bm25
+    # (BM25Okapi(tokenized_docs).get_scores(query.split())) or, for a zero-dependency route
+    # more in keeping with this repo, SQLite FTS5's built-in bm25().
+    if not entries:
+        # TfidfVectorizer().fit_transform([]) raises "empty vocabulary"; guard it.
         return []
-
-    scored: list[tuple[int, int, RunlogEntry]] = []
-    for i, entry in enumerate(entries):
-        title_tokens = set(_tokenize(entry.title))
-        body_tokens = set(_tokenize(entry.body))
-        score = 2 * len(terms & title_tokens) + len(terms & body_tokens)
-        if score > 0:
-            # Negate index so a stable sort keeps earlier entries first within a score tier.
-            scored.append((score, -i, entry))
-
-    scored.sort(reverse=True)
-    return [entry for _, _, entry in scored[:limit]]
+    docs = [f"{e.title}\n{e.body}" for e in entries]
+    vectorizer = TfidfVectorizer()
+    matrix = vectorizer.fit_transform(docs)
+    # TF-IDF rows are L2-normalized, so this dot product is exactly the cosine similarity.
+    # An empty or all-unknown query yields a zero vector, hence all-zero scores -> no matches.
+    scores = (vectorizer.transform([query]) @ matrix.T).toarray().ravel()
+    # (-scores).argsort is descending; kind="stable" makes earlier entries win ties.
+    order = (-scores).argsort(kind="stable")
+    # The `> 0` filter is load-bearing: it makes a no-match query return [] (and thus
+    # format_entries' "no matching entries" sentinel) rather than unrelated entries.
+    return [entries[i] for i in order if scores[i] > 0][:limit]
 
 
 def format_entries(entries: list[RunlogEntry]) -> str:

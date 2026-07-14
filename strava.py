@@ -5,6 +5,7 @@
 #     "stravalib==2.4",
 #     "llm==0.31",
 #     "python-dotenv==1.0.1",
+#     "scikit-learn",
 # ]
 # ///
 
