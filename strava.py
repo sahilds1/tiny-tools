@@ -23,6 +23,9 @@ import llm
 from dotenv import load_dotenv
 from stravalib import Client
 
+# Imported as a module, not `from strava_tools import RUNLOG_PATH`: --runlog overrides the log
+# path by reassigning strava_tools.RUNLOG_PATH, and search_runlog reads that module global at
+# call time. A `from`-import would bind a separate name here that rebinding never reaches.
 import strava_tools
 from strava_prompts import SYSTEM_PROMPT
 from strava_tools import search_runlog
@@ -208,28 +211,6 @@ def main():
     # - model.conversation() is a multi-turn object that retains history automatically, so
     #   follow-up questions keep the context of earlier turns (and the activity below).
     #
-    # Future extensions — staying on `llm` vs. an agent SDK:
-    # This tool uses `llm` for the chat, and for tools it uses `llm`'s tool-calling loop
-    # (`model.conversation(tools=[...])` then `conversation.chain(prompt)`, which auto-executes
-    # tool calls and re-prompts until the model answers). Tools are plain Python functions whose
-    # docstring becomes the schema — e.g. a runlog search in strava_tools.py. `llm` keeps this a
-    # self-contained, minimal-dependency script and stays provider-agnostic.
-    # If this ever grows into a richer agent — several tools, input/output guardrails, evals,
-    # persistent memory, or multi-agent handoffs — the OpenAI Agents SDK
-    # (https://developers.openai.com/api/docs/guides/agents) provides those as first-class
-    # primitives, at the cost of a heavier dependency and breaking the repo's one-file-per-tool
-    # convention. Prefer `llm` while the tool surface stays small.
-    #
-    # Reasoning state does NOT carry across turns here. `llm`'s default OpenAI plugin talks to
-    # the Chat Completions API, which never returns a reasoning model's internal reasoning
-    # tokens, and a conversation replays only the visible transcript (prompts, response text,
-    # and — inside a chain — tool calls and their results). So on each turn, and on each hop of
-    # a chain() tool loop, the model re-derives its reasoning from that transcript rather than
-    # resuming an earlier train of thought. Treat the returned text of search_runlog as the
-    # only durable state (hence format_entries returns self-contained titles + bodies).
-    # Preserving reasoning across turns would require the Responses API (via the separate
-    # llm-openai-plugin, `-m openai/...`) AND that plugin threading previous_response_id or
-    # encrypted reasoning content through conversation turns — not something wired up here.
     model = llm.get_model(args.model)
     conversation = model.conversation(tools=[search_runlog])
 
