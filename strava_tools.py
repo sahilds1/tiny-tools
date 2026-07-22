@@ -1,23 +1,42 @@
 # Tools for the strava.py chat agent, exposed to the LLM via `llm`'s tool-calling
-# (model.conversation(tools=[...]) + conversation.chain(...)). `llm` builds each tool's
-# schema from the function signature and uses its docstring as the description shown to the
-# model, so search_runlog's docstring is written for the model to read.
-#
-# Structure mirrors the repo's fetch_*/process_*/format_* seam: the pure helpers
-# (parse_runlog, search_entries, format_entries) do no I/O and are the test targets;
-# search_runlog is the thin tool wrapper that reads the file and glues them together.
+# (model.conversation(tools=[...]) + conversation.chain(...)). 
 
+import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import NamedTuple
 
 from sklearn.feature_extraction.text import TfidfVectorizer
+
+# -------------------------------------------- Tool: Search the athlete's past running log
 
 # Default runlog location (the RUNLOG.txt next to this script). strava.py can override this
 # module attribute from its --runlog flag, and tests point it at a fixture file.
 RUNLOG_PATH = Path(__file__).parent / "RUNLOG.txt"
 
 
-class RunlogEntry(NamedTuple):
+# `llm` builds each tool's schema from the function signature and uses its docstring 
+# as the description shown to the model, so search_runlog's docstring is written for the model to read.
+
+def search_runlog(query: str) -> str:
+    """Search the athlete's past running log for entries relevant to `query`
+    (for example: 'half marathon pacing', 'late-run fade', 'hill workouts').
+    Returns the most relevant past run notes and coaching advice as text. Call this
+    to compare the current activity against past runs or to recall prior guidance,
+    and ground any claims about the athlete's history in what it returns."""
+    text = Path(RUNLOG_PATH).read_text()
+
+    # Structure mirrors the repo's fetch_*/process_*/format_* seam: the pure helpers
+    # (parse_runlog, search_entries, format_entries) do no I/O and are the test targets;
+    # search_runlog is the thin tool wrapper that reads the file and glues them together.
+    return format_entries(search_entries(parse_runlog(text), query))
+
+
+# frozen=True keeps the value semantics a parsed entry wants -- immutable, and compared by
+# field so tests can assert on a whole entry -- without being a tuple: an entry won't compare
+# equal to a bare ("title", "body") pair or silently unpack, and adding a field later (a parsed
+# date, say, normalized in __post_init__) won't shift anyone's positional access.
+@dataclass(frozen=True)
+class RunlogEntry:
     title: str
     body: str
 
@@ -25,30 +44,29 @@ class RunlogEntry(NamedTuple):
 def parse_runlog(text: str) -> list[RunlogEntry]:
     """Split raw runlog text into entries.
 
-    An entry starts at a "title" line -- a non-blank line that is not a bullet ("- ...") --
-    and runs until the next title line. Blank and bullet lines in between form the body.
-    This tolerates the title / blank-line / bullets layout in RUNLOG.txt without needing a
-    strict blank-line delimiter between entries.
+    An entry starts at a "title" line -- a markdown heading ("# ...") -- and runs until the
+    next heading. Everything in between (blank lines, bullets, prose) forms the body, so an
+    entry can hold any content as long as it doesn't open a line with "#". The leading "#"
+    and surrounding whitespace are stripped from the title. Text before the first heading
+    belongs to no entry and is dropped.
     """
-    entries: list[RunlogEntry] = []
-    title: str | None = None
-    body_lines: list[str] = []
-
-    def flush() -> None:
-        if title is not None:
-            entries.append(RunlogEntry(title=title, body="\n".join(body_lines).strip()))
-
-    for raw in text.splitlines():
-        line = raw.rstrip()
-        is_title = bool(line.strip()) and not line.lstrip().startswith("-")
-        if is_title:
-            flush()
-            title = line.strip()
-            body_lines = []
-        elif title is not None:
-            body_lines.append(line)
-    flush()
-    return entries
+    # Splitting on the heading pattern hands us each title and body whole, so they go straight
+    # into the immutable RunlogEntry -- no line-by-line accumulator to build them up in.
+    #
+    # re.split with a capturing group keeps what it captures instead of discarding it, so the
+    # result interleaves captured headings with the text between them:
+    #     [text before the first heading, title, body, title, body, ...]
+    # Only "(.*)" is captured, so the leading "#"s and spaces go away with the rest of the
+    # separator. After index 0 the list strictly alternates, hence parts[1::2] is every title
+    # and parts[2::2] every body, and zip pairs each title with the body that follows it.
+    # parts[0] is in neither slice -- that's how the pre-heading text gets dropped.
+    # (n headings always yield 2n+1 parts, a trailing heading getting an empty body, so the
+    # two slices are always the same length and zip never truncates one away.)
+    parts = re.split(r"(?m)^[ \t]*#+[ \t]*(.*)$", text)
+    return [
+        RunlogEntry(title.strip(), body.strip())
+        for title, body in zip(parts[1::2], parts[2::2])
+    ]
 
 
 def search_entries(
@@ -100,13 +118,3 @@ def format_entries(entries: list[RunlogEntry]) -> str:
     if not entries:
         return "No matching runlog entries found."
     return "\n\n".join(f"{e.title}\n{e.body}".rstrip() for e in entries)
-
-
-def search_runlog(query: str) -> str:
-    """Search the athlete's past running log for entries relevant to `query`
-    (for example: 'half marathon pacing', 'late-run fade', 'hill workouts').
-    Returns the most relevant past run notes and coaching advice as text. Call this
-    to compare the current activity against past runs or to recall prior guidance,
-    and ground any claims about the athlete's history in what it returns."""
-    text = Path(RUNLOG_PATH).read_text()
-    return format_entries(search_entries(parse_runlog(text), query))

@@ -5,17 +5,17 @@ from strava_tools import (
     search_entries,
 )
 
-# A small multi-entry fixture in the RUNLOG.txt shape: a title line, a blank line, bullets.
-RUNLOG = """April 26 Half Marathon Run
+# A small multi-entry fixture in the RUNLOG.txt shape: a "# " heading, a blank line, bullets.
+RUNLOG = """# April 26 Half Marathon Run
 
 - The fade in watts alongside the pace drop suggests your legs gave out. Add a weekly
   long run finishing at goal pace to build muscular endurance.
 
-May 10 Hill Repeats
+# May 10 Hill Repeats
 
 - Strong power on the climbs; turnover held late. Hills are paying off.
 
-May 17 Easy Recovery Run
+# May 17 Easy Recovery Run
 
 - Nice and controlled, heart rate stayed in zone 2 the whole way.
 """
@@ -32,9 +32,22 @@ def test_parse_runlog_splits_entries():
 
 
 def test_parse_runlog_single_entry_and_trailing_blanks():
-    entries = parse_runlog("Solo Run\n\n- Felt good.\n\n\n")
+    entries = parse_runlog("# Solo Run\n\n- Felt good.\n\n\n")
     assert len(entries) == 1
     assert entries[0] == RunlogEntry(title="Solo Run", body="- Felt good.")
+
+
+def test_parse_runlog_ignores_text_before_first_heading():
+    entries = parse_runlog("stray preamble\n\n# Solo Run\n\nFelt good.\n")
+    assert entries == [RunlogEntry(title="Solo Run", body="Felt good.")]
+
+
+# TODO: Run these against the "# heading" parse_runlog -- the fixtures above were converted
+# from the old bullet-delimited format and test_parse_runlog_ignores_text_before_first_heading
+# is new, so neither has been executed yet.
+# TODO: Add a case for a heading with no body ("# Heat Advisory" appears that way in the real
+# RUNLOG.txt, as does its leading blank line). Those are the two edges of the re.split parse --
+# the dropped parts[0] and the empty trailing body -- and only the first is covered above.
 
 
 # The search_entries tests cover only the wrapping logic we wrote around TfidfVectorizer --
