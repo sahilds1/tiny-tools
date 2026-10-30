@@ -211,8 +211,13 @@ def main():
     # - model.conversation() is a multi-turn object that retains history automatically, so
     #   follow-up questions keep the context of earlier turns (and the activity below).
     #
+    # - before_call fires before each tool execution, so print it to make the agent's tool
+    #   use visible (otherwise chain() runs tool round-trips silently).
     model = llm.get_model(args.model)
-    conversation = model.conversation(tools=[search_runlog])
+    conversation = model.conversation(
+        tools=[search_runlog],
+        before_call=lambda tool, tool_call: print(f"[tool] {tool_call.name}({tool_call.arguments})"),
+    )
 
     # Seed the activity into context via the system prompt so it's available without a
     # round-trip — nothing is sent until the user asks a question.

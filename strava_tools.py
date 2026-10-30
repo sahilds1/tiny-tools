@@ -18,11 +18,12 @@ RUNLOG_PATH = Path(__file__).parent / "RUNLOG.txt"
 # as the description shown to the model, so search_runlog's docstring is written for the model to read.
 
 def search_runlog(query: str) -> str:
-    """Search the athlete's past running log for entries relevant to `query`
-    (for example: 'half marathon pacing', 'late-run fade', 'hill workouts').
-    Returns the most relevant past run notes and coaching advice as text. Call this
-    to compare the current activity against past runs or to recall prior guidance,
-    and ground any claims about the athlete's history in what it returns."""
+    """Search the athlete's personal running log for entries relevant to `query`
+    (for example: 'July 15', 'heat advisory', 'half marathon training', 'late-run fade').
+    The log holds context the Strava data lacks -- weather, skipped days, how runs felt,
+    training plans, and past coaching advice. Call this whenever the user asks why something
+    happened, about past training, or about their notes, and ground any claims about the
+    athlete's history in what it returns."""
     text = Path(RUNLOG_PATH).read_text()
 
     # Structure mirrors the repo's fetch_*/process_*/format_* seam: the pure helpers
