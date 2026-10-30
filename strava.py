@@ -4,6 +4,7 @@
 # dependencies = [
 #     "stravalib==2.4",
 #     "llm==0.31",
+#     "openai<3",
 #     "python-dotenv==1.0.1",
 #     "scikit-learn",
 # ]
