@@ -4,7 +4,9 @@
 # dependencies = [
 #     "stravalib==2.4",
 #     "llm==0.31",
+#     "openai<3",
 #     "python-dotenv==1.0.1",
+#     "scikit-learn",
 # ]
 # ///
 
@@ -22,7 +24,12 @@ import llm
 from dotenv import load_dotenv
 from stravalib import Client
 
+# Imported as a module, not `from strava_tools import RUNLOG_PATH`: --runlog overrides the log
+# path by reassigning strava_tools.RUNLOG_PATH, and search_runlog reads that module global at
+# call time. A `from`-import would bind a separate name here that rebinding never reaches.
+import strava_tools
 from strava_prompts import SYSTEM_PROMPT
+from strava_tools import search_runlog
 
 TOKEN_PATH = Path.home() / ".strava_tokens.json"
 
@@ -135,10 +142,20 @@ def main():
         default=None,
         help="llm model to use (default: your configured llm default model)",
     )
+    parser.add_argument(
+        "--runlog",
+        default=None,
+        help="Path to the running log the search_runlog tool reads (default: RUNLOG.txt)",
+    )
     args = parser.parse_args()
 
     if args.end and not args.start:
         parser.error("--end requires --start")
+
+    # Point the search_runlog tool at a custom log file if requested (default lives in
+    # strava_tools.RUNLOG_PATH). Set before the tool is ever invoked in the chat loop below.
+    if args.runlog:
+        strava_tools.RUNLOG_PATH = Path(args.runlog)
 
     # Load STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET, and OPENAI_API_KEY from a local .env
     # (gitignored; see .env.example) so they don't have to be exported in the shell.
@@ -194,8 +211,14 @@ def main():
     #   so this script relies on whatever model/key the user has set up via `llm`.
     # - model.conversation() is a multi-turn object that retains history automatically, so
     #   follow-up questions keep the context of earlier turns (and the activity below).
+    #
+    # - before_call fires before each tool execution, so print it to make the agent's tool
+    #   use visible (otherwise chain() runs tool round-trips silently).
     model = llm.get_model(args.model)
-    conversation = model.conversation()
+    conversation = model.conversation(
+        tools=[search_runlog],
+        before_call=lambda tool, tool_call: print(f"[tool] {tool_call.name}({tool_call.arguments})"),
+    )
 
     # Seed the activity into context via the system prompt so it's available without a
     # round-trip — nothing is sent until the user asks a question.
@@ -218,19 +241,20 @@ def main():
         if user_input.lower() in ("exit", "quit"):
             break
 
-        # conversation.prompt() sends the turn to the model; the system prompt (carrying the
-        # activity) is passed only on the first turn, since the conversation retains history.
+        # conversation.chain() sends the turn and, unlike prompt(), auto-executes any
+        # search_runlog tool calls the model makes and re-prompts until it produces a final
+        # answer. The system prompt (carrying the activity) is passed only on the first turn,
+        # since the conversation retains history.
 
         if first_turn:
-            response = conversation.prompt(user_input, system=system)
+            response = conversation.chain(user_input, system=system)
         else:
-            response = conversation.prompt(user_input)
+            response = conversation.chain(user_input)
 
         first_turn = False
 
-        # response.text() resolves and returns the full reply as a single string.
-        # Alternative: an llm response is iterable, so you can stream each text chunk as it
-        # arrives with `for chunk in response: print(chunk, end="", flush=True)`.
+        # response.text() resolves the whole chain (including tool round-trips) and returns the
+        # final reply as a single string.
         print(response.text())
 
 
