@@ -42,12 +42,13 @@ def test_parse_runlog_ignores_text_before_first_heading():
     assert entries == [RunlogEntry(title="Solo Run", body="Felt good.")]
 
 
-# TODO: Run these against the "# heading" parse_runlog -- the fixtures above were converted
-# from the old bullet-delimited format and test_parse_runlog_ignores_text_before_first_heading
-# is new, so neither has been executed yet.
-# TODO: Add a case for a heading with no body ("# Heat Advisory" appears that way in the real
-# RUNLOG.txt, as does its leading blank line). Those are the two edges of the re.split parse --
-# the dropped parts[0] and the empty trailing body -- and only the first is covered above.
+def test_parse_runlog_heading_with_no_body():
+    # "# Heat Advisory" appears this way in the real RUNLOG.txt: a title-only entry.
+    entries = parse_runlog("# Heat Advisory: July 14 - July 15\n\n# Base Training\n\n- Easy miles.\n")
+    assert entries == [
+        RunlogEntry(title="Heat Advisory: July 14 - July 15", body=""),
+        RunlogEntry(title="Base Training", body="- Easy miles."),
+    ]
 
 
 # The search_entries tests cover only the wrapping logic we wrote around TfidfVectorizer --
@@ -72,3 +73,10 @@ def test_search_entries_respects_limit():
 
 def test_format_entries_no_match_sentinel():
     assert format_entries([]) == "No matching runlog entries found."
+
+
+def test_format_entries_includes_titles_and_bodies():
+    # The returned text is the only state that survives into the next turn, so each entry's
+    # title and body must both be in it.
+    entries = [RunlogEntry("May 10 Hill Repeats", "- Strong on the climbs."), RunlogEntry("Heat Advisory", "")]
+    assert format_entries(entries) == "May 10 Hill Repeats\n- Strong on the climbs.\n\nHeat Advisory"
